@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<operators name="indb-oracle" version="6.0" docbundle="com/rapidminer/extension/resources/i18n/OperatorsDocInDB-Oracle">
+    <group key="">
+
+		<group key="indb_ora_cleansing">
+			<operator>
+				<icon>funnel.png</icon>
+				<key>indb_ora_trim</key>
+				<class>com.rapidminer.extension.indboracle.operator.Trim
+				</class>
+			</operator>
+		</group>
+
+    </group>
+</operators>

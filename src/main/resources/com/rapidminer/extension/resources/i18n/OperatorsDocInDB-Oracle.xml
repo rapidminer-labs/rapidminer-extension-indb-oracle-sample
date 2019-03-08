@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="windows-1252" standalone="no"?>
+<operatorHelp lang="en_EN">
+
+   <group>
+      <key>extensions.InDB-Oracle.indb_ora_cleansing</key>
+      <name>Cleansing</name>
+   </group>
+
+	<operator>
+		<key>indb_ora_trim</key>
+		<name>Trim (In Database)</name>
+		<synopsis>Trims the values of the selected nominal attributes</synopsis>
+		<help>&lt;p&gt;This operator performs a trim operator on all nominal attributes of
+			the selected attribute set.&lt;/p&gt;</help>
+	</operator>
+
+</operatorHelp>
