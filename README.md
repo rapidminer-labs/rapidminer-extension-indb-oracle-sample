@@ -11,12 +11,13 @@ The extension brings built-in support for MySQL, PostgreSQL and Google BigQuery.
 What is this sample project about?
 ----------------------------------
 
-This a just a sample project. It aims to show you how to extend the database support and the operator set that the In-Database Processing extension provides. It uses the well-defined concepts of that extension to help adding database-specific code as simply as possible. This project also works as a regular RapidMiner extension that can be used together with the original In-Database Processing extension.
+This a just a sample project. It aims to show you how to extend the database support and the operator set that the In-Database Processing extension provides. It uses the well-defined concepts of that extension to help adding database-specific code as simply as possible. This project also works as a regular RapidMiner extension that can be used together with the original In-Database Processing extension. Note that to be able to use this extension, you need to enable **Grand additional permissions to unsigned extensions** under **Preferences** / **Start-up** (requires a Studio restart after changing the setting, see the [documentation for details](https://docs.rapidminer.com/latest/developers/extensions/security/#permissions)).
 
 The goal here is to allow partners, customers to extend the In-Database Processing capibilities to also cover their RDBMS/cloud engine where they may have more expertise than anyone else. You are also encouraged to join the community and share your extension with others as well.
 
 Disclaimer
 ----------
+
 Do NOT use this extension in production. It is just a sample that provides an example on how to customize the behaviour of In-Database Processing extension for your database. It does not add support for Oracle databases, only shows you how you can start a similar project. Also, see incomplete list of known issues below.
 
 How to extend In-Database Processing capabilities?

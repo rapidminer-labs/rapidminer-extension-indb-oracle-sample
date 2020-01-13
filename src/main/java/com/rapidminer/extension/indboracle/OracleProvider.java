@@ -19,23 +19,33 @@ package com.rapidminer.extension.indboracle;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
 import com.rapidminer.example.Attribute;
 import com.rapidminer.extension.indatabase.DbTools;
+import com.rapidminer.extension.indatabase.db.CachedDatabaseHandler;
+import com.rapidminer.extension.indatabase.db.object.Column;
 import com.rapidminer.extension.indatabase.db.step.DbStep;
+import com.rapidminer.extension.indatabase.db.step.Filter.FilterCondition;
 import com.rapidminer.extension.indatabase.db.step.Join;
+import com.rapidminer.extension.indatabase.db.step.Sample;
+import com.rapidminer.extension.indatabase.metadata.DbTableMetaData;
 import com.rapidminer.extension.indatabase.operator.function.FunctionDefinition;
 import com.rapidminer.extension.indatabase.provider.DatabaseProvider;
+import com.rapidminer.extension.indatabase.provider.QueryRunner;
 import com.rapidminer.extension.indatabase.provider.other.GenericProvider;
 import com.rapidminer.extension.indatabase.sql.SqlSyntax;
 import com.rapidminer.extension.indboracle.sql.JoinOracleSql;
+import com.rapidminer.extension.indboracle.sql.SampleOracleSql;
 import com.rapidminer.extension.jdbc.tools.jdbc.DatabaseHandler;
+import com.rapidminer.operator.OperatorException;
+import com.rapidminer.operator.UserError;
+import com.rapidminer.tools.Ontology;
 
 
 /**
@@ -72,12 +82,13 @@ public enum OracleProvider implements DatabaseProvider {
 	}
 
 	@Override
-	public List<String> getTableNames(DatabaseHandler internalDBHandler, String schemaName) throws SQLException {
+	public List<String> getTableNames(CachedDatabaseHandler handler, String schemaName) throws SQLException, UserError {
 		List<String> tableList = new ArrayList<>();
 
 		String sqlQuery = "SELECT table_name FROM all_tables WHERE owner = ?";
 		LOGGER.fine(String.format("Finding tables in schema '%s'", schemaName));
-		try (PreparedStatement st = internalDBHandler.createPreparedStatement(sqlQuery, false)) {
+		try (DatabaseHandler dbHandler = handler.getConnectedDatabaseHandler();
+				PreparedStatement st = dbHandler.createPreparedStatement(sqlQuery, false)) {
 			st.setString(1, schemaName);
 			try (ResultSet rs = st.executeQuery()) {
 				while (rs.next()) {
@@ -90,14 +101,20 @@ public enum OracleProvider implements DatabaseProvider {
 	}
 
 	@Override
-	public List<Attribute> getColumnMetaData(DatabaseHandler internalDBHandler, String schemaName, String tableName)
-			throws SQLException {
+	public List<Attribute> getColumnMetaData(CachedDatabaseHandler handler, String schemaName, String tableName)
+			throws SQLException, UserError {
 		// LIMIT clause is not supported by Oracle
 		String sqlQuery = "SELECT * FROM " + quote(schemaName) + "." + quote(tableName) + " WHERE 0=1";
 		LOGGER.fine(String.format("Finding columns in table '%s'.'%s'", schemaName, tableName));
-		List<Attribute> attrs;
-		try (Statement st = internalDBHandler.createStatement(false, false); ResultSet rs = st.executeQuery(sqlQuery)) {
-			attrs = createAttributes(rs);
+		List<Attribute> attrs = new ArrayList<>();
+		try (QueryRunner queryRunner = createQueryRunner(handler)) {
+			queryRunner.executeQuery(sqlQuery).createExampleTable(null).build().getAttributes().allAttributes()
+					.forEachRemaining(attrs::add);
+		} catch (OperatorException e) {
+			// TODO: declare throwing OperatorException when the API supports it
+			throw new SQLException(e);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		}
 		LOGGER.fine(String.format("Done finding columns in table '%s'.'%s'", schemaName, tableName));
 		return attrs;
@@ -107,6 +124,50 @@ public enum OracleProvider implements DatabaseProvider {
 	public Map<Class<? extends DbStep>, SqlSyntax<?>> getDbStepToSyntaxMap() {
 		Map<Class<? extends DbStep>, SqlSyntax<?>> res = DatabaseProvider.super.getDbStepToSyntaxMap();
 		res.put(Join.class, new JoinOracleSql());
+		res.put(Sample.class, new SampleOracleSql());
 		return res;
+	}
+
+	@Override
+	public Map<FilterCondition, BiFunction<String, String, String>> getFilterSyntax() {
+		Map<FilterCondition, BiFunction<String, String, String>> res = DatabaseProvider.super.getFilterSyntax();
+
+		// no default escape character in Oracle, need to explicitly set it
+		res.put(FilterCondition.CONTAINS,
+				(col, val) -> col + " LIKE " + literal("%" + escapeLikeExpr(val) + "%") + " ESCAPE '\\'");
+		res.put(FilterCondition.DOES_NOT_CONTAIN,
+				(col, val) -> col + " NOT LIKE " + literal("%" + escapeLikeExpr(val) + "%") + " ESCAPE '\\'");
+		res.put(FilterCondition.STARTS_WITH,
+				(col, val) -> col + " LIKE " + literal(escapeLikeExpr(val) + "%") + " ESCAPE '\\'");
+		res.put(FilterCondition.ENDS_WITH,
+				(col, val) -> col + " LIKE " + literal("%" + escapeLikeExpr(val)) + " ESCAPE '\\'");
+
+		// need to use REGEXP_LIKE function
+		res.put(FilterCondition.MATCHES, (col, val) -> "REGEXP_LIKE(" + col + ", " + literal("^" + val + "$") + ")");
+		return res;
+	}
+
+	@Override
+	public boolean supportsDropIfExistsSyntax() {
+		return false;
+	}
+
+	@Override
+	public String format(String val, Column c) {
+		// only format date related objects
+		int type = DbTableMetaData.getRapidMinerTypeIndex(c.getType());
+		if (Ontology.ATTRIBUTE_VALUE_TYPE.isA(type, Ontology.DATE_TIME)) {
+			String dateStr = literal(DbTools.defaultFormat(val, type));
+			String dateFormatOracle;
+			if (Ontology.ATTRIBUTE_VALUE_TYPE.isA(type, Ontology.DATE)) {
+				dateFormatOracle = "YYYY-MM-DD";
+			} else if (Ontology.ATTRIBUTE_VALUE_TYPE.isA(type, Ontology.TIME)) {
+				dateFormatOracle = "hh24:mi:ss";
+			} else {
+				dateFormatOracle = "YYYY-MM-DD hh24:mi:ss";
+			}
+			val = "TO_DATE(" + dateStr + ", '" + dateFormatOracle + "')";
+		}
+		return val;
 	}
 }
