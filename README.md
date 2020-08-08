@@ -15,6 +15,8 @@ This a just a sample project. It aims to show you how to extend the database sup
 
 The goal here is to allow partners, customers to extend the In-Database Processing capibilities to also cover their RDBMS/cloud engine where they may have more expertise than anyone else. You are also encouraged to join the community and share your extension with others as well.
 
+You can find the [changelog for this repository here](CHANGES.md).
+
 Disclaimer
 ----------
 

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
+import com.rapidminer.RapidMiner;
 import com.rapidminer.example.Attribute;
 import com.rapidminer.extension.indatabase.DbTools;
 import com.rapidminer.extension.indatabase.db.CachedDatabaseHandler;
@@ -46,6 +47,7 @@ import com.rapidminer.extension.jdbc.tools.jdbc.DatabaseHandler;
 import com.rapidminer.operator.OperatorException;
 import com.rapidminer.operator.UserError;
 import com.rapidminer.tools.Ontology;
+import com.rapidminer.tools.ParameterService;
 
 
 /**
@@ -85,7 +87,14 @@ public enum OracleProvider implements DatabaseProvider {
 	public List<String> getTableNames(CachedDatabaseHandler handler, String schemaName) throws SQLException, UserError {
 		List<String> tableList = new ArrayList<>();
 
-		String sqlQuery = "SELECT table_name FROM all_tables WHERE owner = ?";
+		boolean onlyStandardTables = Boolean
+				.parseBoolean(ParameterService.getParameterValue(RapidMiner.PROPERTY_RAPIDMINER_TOOLS_DB_ONLY_STANDARD_TABLES));
+		String sqlQuery = "SELECT object_name FROM all_objects WHERE owner = ? AND OBJECT_TYPE IN (%s)";
+		if (onlyStandardTables) {
+			sqlQuery = String.format(sqlQuery, literal("TABLE"));
+		} else {
+			sqlQuery = String.format(sqlQuery, literal("TABLE") + ", " + literal("VIEW"));
+		}
 		LOGGER.fine(String.format("Finding tables in schema '%s'", schemaName));
 		try (DatabaseHandler dbHandler = handler.getConnectedDatabaseHandler();
 				PreparedStatement st = dbHandler.createPreparedStatement(sqlQuery, false)) {
